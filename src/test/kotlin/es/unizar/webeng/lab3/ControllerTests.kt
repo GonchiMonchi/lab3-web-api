@@ -1,6 +1,7 @@
 package es.unizar.webeng.lab3
 
 import com.ninjasquad.springmockk.MockkBean
+import io.mockk.*
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
@@ -12,6 +13,7 @@ import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
+import java.util.*
 
 private val MANAGER_REQUEST_BODY = { name: String ->
     """
@@ -46,6 +48,17 @@ class ControllerTests {
     fun `POST is not safe and not idempotent`() {
 
         // SETUP
+
+        // Ensure in first call that the repository save the employee
+        // with id = 1 and with id = 2 in the second call.
+        val employee = slot<Employee>()
+        every {
+            employeeRepository.save(capture(employee))
+        } answers {
+            employee.captured.copy(id = 1)
+        } andThenAnswer {
+            employee.captured.copy(id = 2)
+        }
 
         mvc.post("/employees") {
             contentType = MediaType.APPLICATION_JSON
@@ -82,6 +95,20 @@ class ControllerTests {
 
         // SETUP
 
+        // Ensure that the repository returns a specific employee with id = 1.
+        every {
+            employeeRepository.findById(1)
+        } answers {
+            Optional.of(Employee("Mary", "Manager", 1))
+        }
+
+        // Ensure that the repository does not contain an employee with id = 2.
+        every {
+            employeeRepository.findById(2)
+        } answers {
+            Optional.empty()
+        }
+
         mvc.get("/employees/1").andExpect {
             status { isOk() }
             content {
@@ -104,12 +131,39 @@ class ControllerTests {
 
         // VERIFY
 
+        // Verify that findById(1) has been called twice.
+        verify(exactly = 2) {
+            employeeRepository.findById(1)
+        }
+
+        // No hace falta comprobar save ni delete, no esta definido el comportamiento
+        // para la funcion save ni para delete, asi que si ocurriera,
+        // mock lanzaria una excepcion y fallaría el test
+
     }
 
     @Test
     fun `PUT is idempotent but not safe`() {
 
         // SETUP
+
+        // Ensure that the repository save the employee without modifying its id.
+        val employee = slot<Employee>()
+        every {
+            employeeRepository.save(capture(employee))
+        } answers {
+            employee.captured
+        }
+
+        // Ensure in first call that the repository does not contain an employee
+        // with id = 1 and a specific employee in the second call.
+        every {
+            employeeRepository.findById(1)
+        } answers {
+            Optional.empty()
+        } andThenAnswer {
+            Optional.of(Employee("Tom", "Manager", 1))
+        }
 
         mvc.put("/employees/1") {
             contentType = MediaType.APPLICATION_JSON
@@ -139,12 +193,32 @@ class ControllerTests {
 
         // VERIFY
 
+        // Verify that save has been called twice with an employee with id = 1.
+        verify(exactly = 2) {
+            employeeRepository.save(Employee("Tom", "Manager", 1))
+        }
+
     }
 
     @Test
     fun `DELETE is idempotent but not safe`() {
 
         // SETUP
+
+        // Ensure that the call to delete an employee identified by id = 1 works.
+        justRun {
+            employeeRepository.deleteById(1)
+        }
+
+        // Ensure in first call that the repository contain a specific with id = 1
+        // and none identified by id = 1 in the second call.
+        every {
+            employeeRepository.findById(1)
+        } answers {
+            Optional.of(Employee("Tom", "Manager", 1))
+        } andThenAnswer {
+            Optional.empty()
+        }
 
         mvc.delete("/employees/1").andExpect {
             status { isNoContent() }
@@ -155,6 +229,11 @@ class ControllerTests {
         }
 
         // VERIFY
+
+        // Verify that deleteById(1) has been called once.
+        verify(exactly = 1) {
+            employeeRepository.deleteById(1)
+        }
 
     }
 }
