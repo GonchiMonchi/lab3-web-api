@@ -1,7 +1,10 @@
 package es.unizar.webeng.lab3
 
 import com.ninjasquad.springmockk.MockkBean
-import io.mockk.*
+import io.mockk.every
+import io.mockk.justRun
+import io.mockk.slot
+import io.mockk.verify
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
@@ -85,9 +88,6 @@ class ControllerTests {
                 json(MANAGER_RESPONSE_BODY("Mary", 2))
             }
         }
-
-        // VERIFY
-
     }
 
     @Test
@@ -135,11 +135,9 @@ class ControllerTests {
         verify(exactly = 2) {
             employeeRepository.findById(1)
         }
-
         // No hace falta comprobar save ni delete, no esta definido el comportamiento
         // para la funcion save ni para delete, asi que si ocurriera,
         // mock lanzaria una excepcion y fallaría el test
-
     }
 
     @Test
@@ -197,7 +195,6 @@ class ControllerTests {
         verify(exactly = 2) {
             employeeRepository.save(Employee("Tom", "Manager", 1))
         }
-
     }
 
     @Test
@@ -234,6 +231,5 @@ class ControllerTests {
         verify(exactly = 1) {
             employeeRepository.deleteById(1)
         }
-
     }
 }
